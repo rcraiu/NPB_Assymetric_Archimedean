@@ -1,0 +1,7 @@
+root <- normalizePath(file.path(testthat::test_path(), "..", ".."))
+Sys.setenv(KHOUDRAJI_ROOT = root)
+source(file.path(root, "R", "khoudraji_bnp.R"))
+source(file.path(root, "R", "simulation.R"))
+source(file.path(root, "R", "mcmc.R"))
+source(file.path(root, "R", "postprocess.R"))
+source(file.path(root, "R", "studies.R"))

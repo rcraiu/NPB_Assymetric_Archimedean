@@ -1,0 +1,3 @@
+"model","lpml","m_mean","m_mode","salso_clusters","largest_cluster_size","largest_theta","largest_alpha1","largest_alpha2","tau_empirical","tau_predictive"
+"exchangeable",9.13137067757415,1.16,1,1,500,0.271041591850238,1,1,0.158797595190381,0.124535493549355
+"free",12.6059837141184,1.376,1,1,500,5.30203479955402,0.732548117411658,0.219390790267808,0.158797595190381,0.115328332833283

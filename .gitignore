@@ -1,0 +1,10 @@
+results/*
+!results/full/
+results/full/raw/
+raw/
+*.so
+*.o
+.Rhistory
+.RData
+Rplots.pdf
+.DS_Store

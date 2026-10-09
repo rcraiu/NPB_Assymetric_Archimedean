@@ -1,0 +1,2 @@
+"job_id","scenario","family","model","n","d","lpml","m_mean","m_mode","theta_mean","acceptance_theta","acceptance_alpha","cluster_method"
+"sim1_0.8_0.3_n500_FRA_exchangeable","sim1","FRA","exchangeable",500,2,30.3119929828354,1.3025,1,2.12590527096582,0.459080200757964,0,"SALSO Binder"

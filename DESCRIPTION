@@ -1,0 +1,19 @@
+Package: KhoudrajiBNPRepro
+Type: Project
+Title: Reproducibility Stack for Asymmetric Archimedean BNP Mixtures
+Version: 0.1.0
+Authors@R: c(person("Radu", "Craiu", role = c("aut", "cre"),
+                    email = "radu.craiu@utoronto.ca"))
+Description: Simulation, inference, diagnostics, clustering, and manuscript
+    outputs for Sections 4.1--4.4 of the asymmetric Archimedean copula study.
+License: MIT
+Encoding: UTF-8
+Imports:
+    copula,
+    mvtnorm,
+    Rcpp
+Suggests:
+    salso,
+    testthat
+LinkingTo:
+    Rcpp
