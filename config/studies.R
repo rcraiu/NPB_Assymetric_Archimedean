@@ -12,8 +12,12 @@ study_scenarios <- list(
     models = c("free", "exchangeable")
   ),
   sim2 = list(
-    n = 500L, families = "CLA", models = c("free", "exchangeable"),
-    prior = list(c_b = 2, d_b = 10)
+    n = 500L, replicates = 20L, families = "CLA",
+    models = c("free", "exchangeable"),
+    ## Mirror-asymmetric truth: CLA(50; 1, .65) and CLA(50; .65, 1).
+    ## c_th/d_th widen the Clayton theta prior to Gamma(4, .08) (mean 50);
+    ## c_b/d_b are the cluster-concentration prior used since manuscript v2.
+    prior = list(c_b = 2, d_b = 10, c_th = 4, d_th = .08)
   ),
   sim3 = list(n = 1000L, families = "GUM",
               models = c("free", "exchangeable")),

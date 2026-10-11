@@ -56,6 +56,11 @@ saveRDS(fit, raw_file, compress = "xz")
 summary <- compact_summary(fit, row$scenario, job_id, cfg$tau_n,
                            as.integer(row$fit_seed) + 5000L)
 summary$truth <- dat$truth
+if (!is.null(dat$truth$z)) {
+  summary$metrics <- clustering_metrics(
+    fit, dat$truth$z, summary$psm, summary$partition,
+    summary$partition_binder2, summary$partition_vi)
+}
 summary$empirical_tau <- dat$empirical_tau
 summary$data_seed <- dat$data_seed
 summary$fit_seed <- as.integer(row$fit_seed)

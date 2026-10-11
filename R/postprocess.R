@@ -173,3 +173,37 @@ write_contour_pdf <- function(U, predictive, file, title = "") {
                 xlab = "u1", ylab = "u2")
   invisible(TRUE)
 }
+
+## ---- clustering recovery metrics against generating labels ----------------
+adjusted_rand <- function(x, y) {
+  tab <- table(x, y)
+  choose2 <- function(z) z * (z - 1) / 2
+  total <- choose2(sum(tab))
+  expected <- sum(choose2(rowSums(tab))) * sum(choose2(colSums(tab))) / total
+  upper <- .5 * (sum(choose2(rowSums(tab))) + sum(choose2(colSums(tab))))
+  if (upper == expected) return(1)
+  (sum(choose2(tab)) - expected) / (upper - expected)
+}
+
+## Partition-free and point-estimate summaries of recovery of the generating
+## labels `truth_z`: ARI of every retained draw, mean posterior similarity
+## within/between true groups, and ARI of the PSM average-linkage cut at K = 2.
+clustering_metrics <- function(fit, truth_z, P, partition, partition_binder2,
+                               partition_vi) {
+  z <- as.matrix(fit$z)
+  ari_draws <- apply(z, 1, adjusted_rand, y = truth_z)
+  same <- outer(truth_z, truth_z, `==`)
+  off <- upper.tri(P)
+  hc2 <- stats::cutree(stats::hclust(stats::as.dist(1 - P), "average"), 2)
+  data.frame(
+    ari_binder = adjusted_rand(partition, truth_z),
+    ari_binder2 = adjusted_rand(partition_binder2, truth_z),
+    ari_vi = adjusted_rand(partition_vi, truth_z),
+    ari_psm2 = adjusted_rand(hc2, truth_z),
+    ari_draw_mean = mean(ari_draws), ari_draw_sd = sd(ari_draws),
+    psm_within = mean(P[off & same]), psm_between = mean(P[off & !same]),
+    k_binder = length(unique(partition)),
+    k_binder2 = length(unique(partition_binder2)),
+    k_vi = length(unique(partition_vi))
+  )
+}

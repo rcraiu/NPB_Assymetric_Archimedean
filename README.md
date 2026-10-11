@@ -28,10 +28,15 @@ exactly one deterministic data set. Each fit has its own `fit_seed`.
 
 - Simulation 1: all four alpha truths, `n=200,500`, free and exchangeable
   Clayton/Frank/Gumbel BNP kernels.
-- Simulation 2: free and exchangeable Clayton kernels for
-  `CLA(30; 1, .95)` and `CLA(1; .05, 1)` at `n=500`. For this clustering
-  experiment only, `b+a ~ Gamma(2,10)` replaces the default `Gamma(1,20)`
-  prior.
+- Simulation 2: free and exchangeable Clayton kernels on 20 seeded data sets
+  (`mirror_rep01`--`mirror_rep20`, `n=500`) from the mirror-asymmetric mixture
+  `0.5 CLA(50; 1, .65) + 0.5 CLA(50; .65, 1)`. The components share `theta`
+  and Kendall tau and differ only in the direction of asymmetry, so no
+  exchangeable kernel can separate them. For this experiment only,
+  `theta ~ Gamma(4, .08)` and `b+a ~ Gamma(2,10)` replace the defaults.
+  Each job stores recovery metrics against the generating labels (ARI of the
+  Binder, Binder `K<=2`, VI and PSM-cut partitions, per-draw ARI, and
+  within/between posterior similarity). Replicate 1 is the featured data set.
 - Simulation 3: free and exchangeable Gumbel kernels.
 - Simulation 4: single and two-component Gaussian truths at `n=500`, with
   free and exchangeable Clayton/Frank/Gumbel kernels.
@@ -132,3 +137,10 @@ Monte Carlo approximations with deterministic seeds. Clayton is restricted to
 positive theta because its negative bivariate form contains a singular boundary
 component that is outside the absolutely continuous likelihood implemented
 here.
+
+## Legacy Simulation 2 (manuscript v2)
+
+The earlier single-data-set Simulation 2 (`CLA(30; 1, .95)` and
+`CLA(1; .05, 1)`) is archived, with its summaries and figures, under
+`results/full/legacy_v2_sim2/` (fitted chains excluded). It is no longer in
+the job manifest and no longer feeds the manuscript tables.

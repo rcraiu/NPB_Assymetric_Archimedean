@@ -28,8 +28,9 @@ for (alpha in s1$alpha) for (n in s1$n) {
     add("sim1", truth, n, fam, model, variant)
 }
 s2 <- study_scenarios$sim2
-for (fam in s2$families) for (model in s2$models)
-  add("sim2", "two_khoudraji", s2$n, fam, model, 1L)
+for (rep in seq_len(s2$replicates)) for (fam in s2$families)
+  for (model in s2$models)
+    add("sim2", sprintf("mirror_rep%02d", rep), s2$n, fam, model, rep)
 s3 <- study_scenarios$sim3
 for (fam in s3$families) for (model in s3$models)
   add("sim3", "gumbel_3d", s3$n, fam, model, 1L)

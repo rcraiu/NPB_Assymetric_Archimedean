@@ -10,6 +10,7 @@ Sys.setenv(KHOUDRAJI_ROOT = root)
 source(file.path(root, "R", "khoudraji_bnp.R"))
 source(file.path(root, "R", "simulation.R"))
 source(file.path(root, "R", "postprocess.R"))
+source(file.path(root, "R", "studies.R"))
 
 full <- file.path(root, "results", "full")
 summary_dir <- file.path(full, "summaries")
@@ -39,22 +40,11 @@ tau_matrix <- function(s) {
   ans
 }
 
-fmt_num <- function(x, digits = 2) formatC(x, digits = digits, format = "f")
+fmt_num <- function(x, digits = 2)
+  sub("^-(0\\.0+)$", "\\1", formatC(x, digits = digits, format = "f"))
 fmt_vec <- function(x, digits = 2)
   paste0("(", paste(fmt_num(x, digits), collapse = ","), ")")
 write_tex <- function(x, name) writeLines(x, file.path(out, name))
-adjusted_rand <- function(x, y) {
-  tab <- table(x, y)
-  choose2 <- function(z) z * (z - 1) / 2
-  total <- choose2(sum(tab))
-  expected <- sum(choose2(rowSums(tab))) *
-    sum(choose2(colSums(tab))) / total
-  upper <- .5 * (sum(choose2(rowSums(tab))) +
-                   sum(choose2(colSums(tab))))
-  if (upper == expected) return(1)
-  (sum(choose2(tab)) - expected) / (upper - expected)
-}
-
 ## Simulation 1: all sample sizes, truths, and kernel families.
 truths <- c("1_1", "0.8_0.3", "0.4_0.4", "0_0")
 truth_tex <- c(
@@ -101,32 +91,96 @@ write_tex(c(
   "\\end{tabular}"
 ), "table_sim1.tex")
 
-## Simulation 2.
+## Simulation 2: mirror-asymmetric mixture, R replicate data sets.
+## Replicate 1 is the featured data set (Tables 2--3, Figure 2); all
+## replicates feed the summary table and the replicate figure.
+manifest <- read.csv(file.path(root, "config", "job_manifest.csv"),
+                     stringsAsFactors = FALSE)
+sim2_jobs <- manifest[manifest$scenario == "sim2" & manifest$model == "free", ]
+n_rep <- nrow(sim2_jobs)
+oracle_free <- function(row) {
+  dat <- generate_study_data(as.list(row))
+  comps <- dat$truth$components
+  l <- sapply(comps, function(cmp)
+    log_d_khoud(dat$U, cmp$theta, cmp$alpha, cmp$family))
+  adjusted_rand(max.col(l), dat$truth$z)
+}
+opposite_orientation <- function(cl) {
+  nrow(cl) == 2L && prod(sign(cl[["1"]] - cl[["2"]])) < 0
+}
+rep_rows <- list()
+for (i in seq_len(n_rep)) {
+  row <- sim2_jobs[i, ]
+  rep_id <- sub("^sim2_(mirror_rep[0-9]+)_.*$", "\\1", row$job_id)
+  vals <- list()
+  for (model in c("free", "exchangeable")) {
+    s <- read_summary(sprintf("sim2_%s_n500_CLA_%s", rep_id, model))
+    vals[[model]] <- cbind(
+      data.frame(replicate = i, model = model, lpml = s$summary$lpml,
+                 m_mean = s$summary$m_mean,
+                 tau_pp = tau_matrix(s)[2, 1],
+                 opposite = opposite_orientation(s$clusters_binder2)),
+      s$metrics)
+  }
+  rep_rows[[i]] <- do.call(rbind, vals)
+  rep_rows[[i]]$oracle_ari <- oracle_free(row)
+}
+rep_tab <- do.call(rbind, rep_rows)
+write.csv(rep_tab, file.path(out, "table_sim2_replicates.csv"), row.names = FALSE)
+
+msd <- function(x, digits = 2)
+  sprintf("%s (%s)", fmt_num(mean(x), digits), fmt_num(sd(x), digits))
+rep_free <- rep_tab[rep_tab$model == "free", ]
+rep_nest <- rep_tab[rep_tab$model == "exchangeable", ]
+metric_rows <- list(
+  list("LPML", "lpml", 1),
+  list("$E(m\\mid\\bu)$", "m_mean", 2),
+  list("$K_B$ (Binder)", "k_binder", 1),
+  list("ARI, Binder", "ari_binder", 2),
+  list("ARI, Binder ($K\\leq2$)", "ari_binder2", 2),
+  list("ARI, VI", "ari_vi", 2),
+  list("ARI, PSM cut at $K=2$", "ari_psm2", 2),
+  list("Posterior-mean ARI", "ari_draw_mean", 2),
+  list("PSM within $-$ between", NA, 2)
+)
+sim2_rep_rows <- vapply(metric_rows, function(m) {
+  get <- function(d) if (is.na(m[[2]])) d$psm_within - d$psm_between else d[[m[[2]]]]
+  sprintf("%s & %s & %s \\\\", m[[1]], msd(get(rep_free), m[[3]]),
+          msd(get(rep_nest), m[[3]]))
+}, character(1))
+d_lpml <- rep_free$lpml - rep_nest$lpml
+sim2_rep_rows <- c(
+  sim2_rep_rows,
+  sprintf("Oracle ARI (true parameters) & \\multicolumn{2}{c}{%s} \\\\",
+          msd(rep_free$oracle_ari)),
+  sprintf("Free beats nested in LPML / ARI$_{B,2}$ & \\multicolumn{2}{c}{%d / %d of %d} \\\\",
+          sum(d_lpml > 0), sum(rep_free$ari_binder2 > rep_nest$ari_binder2),
+          n_rep),
+  sprintf("Opposite-orientation clusters found (Binder $K\\leq2$) & %d of %d & %d of %d \\\\",
+          sum(rep_free$opposite), n_rep, sum(rep_nest$opposite), n_rep)
+)
+write_tex(c(
+  "\\begin{tabular}{lcc}",
+  "\\hline\\hline",
+  sprintf("Summary over %d data sets & Free & Nested \\\\", n_rep),
+  "\\hline",
+  sim2_rep_rows,
+  "\\hline\\hline",
+  "\\end{tabular}"
+), "table_sim2_replicates.tex")
+
+## Featured replicate (replicate 1).
 sim2_rows <- character()
-sim2_csv <- list()
 sim2_cluster_rows <- character()
 for (model in c("exchangeable", "free")) {
-  id <- paste0("sim2_two_khoudraji_n500_CLA_", model)
-  s <- read_summary(id)
-  pred <- tau_matrix(s)[2, 1]
-  ari_binder <- adjusted_rand(s$partition, s$truth$z)
-  ari_binder2 <- adjusted_rand(s$partition_binder2, s$truth$z)
-  ari_vi <- adjusted_rand(s$partition_vi, s$truth$z)
+  s <- read_summary(sprintf("sim2_mirror_rep01_n500_CLA_%s", model))
+  m <- s$metrics
   sim2_rows <- c(sim2_rows, sprintf(
-    "%s & %.2f & %.2f & %d & %.2f & %.2f & %d & %.2f & %.3f \\\\",
+    "%s & %.2f & %.2f & %d & %.2f & %.2f & %d & %.2f & %.2f & %.3f \\\\",
     if (model == "free") "Free" else "Nested",
-    s$summary$lpml, s$summary$m_mean,
-    nrow(s$clusters), ari_binder, ari_binder2,
-    nrow(s$clusters_vi), ari_vi, pred
-  ))
-  sim2_csv[[model]] <- data.frame(
-    model = model, lpml = s$summary$lpml, m_mean = s$summary$m_mean,
-    m_mode = s$summary$m_mode,
-    binder_clusters = nrow(s$clusters), binder_ari = ari_binder,
-    binder2_ari = ari_binder2,
-    vi_clusters = nrow(s$clusters_vi), vi_ari = ari_vi,
-    tau_empirical = s$empirical_tau[1, 2], tau_predictive = pred
-  )
+    s$summary$lpml, s$summary$m_mean, m$k_binder, m$ari_binder,
+    m$ari_binder2, m$k_vi, m$ari_vi, m$ari_draw_mean,
+    tau_matrix(s)[2, 1]))
   if (model == "free") {
     for (partition_name in c("Binder $K\\leq2$", "VI")) {
       clusters <- if (partition_name == "Binder $K\\leq2$")
@@ -137,24 +191,20 @@ for (model in c("exchangeable", "free")) {
           "%s & %d & %d & %.2f & %s \\\\",
           partition_name, clusters$cluster[i], clusters$size[i],
           clusters$theta_mean[i],
-          fmt_vec(as.numeric(clusters[i, c("1", "2")]))
-        ),
-        character(1)
-      ))
+          fmt_vec(as.numeric(clusters[i, c("1", "2")]))),
+        character(1)))
     }
   }
 }
-write.csv(do.call(rbind, sim2_csv), file.path(out, "table_sim2.csv"),
-          row.names = FALSE)
 write_tex(c(
-  "\\begin{tabular}{lrrrrrrrr}",
+  "\\begin{tabular}{lrrrrrrrrr}",
   "\\hline\\hline",
-  "Model & LPML & $E(m\\mid\\bu)$ & $K_B$ & ARI$_B$ & ARI$_{B,2}$ & $K_V$ & ARI$_V$ & $\\tau_{\\rm pp}$ \\\\",
+  "Model & LPML & $E(m\\mid\\bu)$ & $K_B$ & ARI$_B$ & ARI$_{B,2}$ & $K_V$ & ARI$_V$ & ARI$_{\\rm draw}$ & $\\tau_{\\rm pp}$ \\\\",
   "\\hline",
   sim2_rows,
   "\\hline\\hline",
   "\\end{tabular}"
-), "table_sim2.tex")
+), "table_sim2_mirror.tex")
 write_tex(c(
   "\\begin{tabular}{lrrrr}",
   "\\hline\\hline",
@@ -163,7 +213,7 @@ write_tex(c(
   sim2_cluster_rows,
   "\\hline\\hline",
   "\\end{tabular}"
-), "table_sim2_clusters.tex")
+), "table_sim2_mirror_clusters.tex")
 
 ## Simulation 3.
 sim3_rows <- character()
@@ -263,16 +313,42 @@ render <- function(path, width, height, draw) {
 }
 
 set.seed(99102)
-fit2f <- read_fit("sim2_two_khoudraji_n500_CLA_free")
-fit2e <- read_fit("sim2_two_khoudraji_n500_CLA_exchangeable")
+fit2f <- read_fit("sim2_mirror_rep01_n500_CLA_free")
+fit2e <- read_fit("sim2_mirror_rep01_n500_CLA_exchangeable")
+s2f <- read_summary("sim2_mirror_rep01_n500_CLA_free")
 pred2f <- posterior_predictive(fit2f, 5000L, 991021L)
 pred2e <- posterior_predictive(fit2e, 5000L, 991022L)
-render(file.path(out, "figure_sim2"), 9, 3, function() {
-  old <- par(mfrow = c(1, 3), mar = c(3, 3, 2, 1))
+render(file.path(out, "figure_sim2_mirror"), 12, 3, function() {
+  old <- par(mfrow = c(1, 4), mar = c(3, 3, 2, 1))
   on.exit(par(old))
-  panel(fit2f$U, "Observed")
+  zt <- s2f$truth$z
+  plot(fit2f$U, pch = 16, cex = .55, col = c("#1b6ca8", "#d1495b")[zt],
+       xlim = c(0, 1), ylim = c(0, 1), xlab = expression(u[1]),
+       ylab = expression(u[2]), main = "Observed, by true component")
   panel(pred2e, "Nested predictive")
   panel(pred2f, "Free predictive")
+  ord <- order(zt)
+  P <- s2f$psm[ord, ord]
+  image(seq_len(nrow(P)), seq_len(nrow(P)), P[, rev(seq_len(ncol(P)))],
+        col = hcl.colors(50, "YlOrRd", rev = TRUE), zlim = c(0, 1),
+        xlab = "Observation (ordered by true component)", ylab = "",
+        axes = FALSE, main = "Free posterior similarity")
+  box()
+})
+
+render(file.path(out, "figure_sim2_replicates"), 9, 3.2, function() {
+  old <- par(mfrow = c(1, 3), mar = c(4, 4, 2, 1))
+  on.exit(par(old))
+  boxplot(list(Nested = rep_nest$ari_psm2, Free = rep_free$ari_psm2,
+               Oracle = rep_free$oracle_ari), ylim = c(0, 1),
+          ylab = "ARI (PSM cut, K = 2)", col = c("grey80", "#fbd08a", "white"),
+          main = "Cluster recovery")
+  boxplot(list(Nested = rep_nest$ari_draw_mean, Free = rep_free$ari_draw_mean),
+          ylim = c(0, 1), ylab = "Posterior-mean ARI",
+          col = c("grey80", "#fbd08a"), main = "Draw-level recovery")
+  plot(rep_free$lpml - rep_nest$lpml, type = "h", lwd = 3,
+       xlab = "Data set", ylab = "LPML(free) - LPML(nested)",
+       main = "Predictive fit", ylim = c(0, 1.05 * max(rep_free$lpml - rep_nest$lpml)))
 })
 
 for (truth in c("single", "two")) {

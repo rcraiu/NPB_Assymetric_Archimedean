@@ -13,20 +13,20 @@ generate_study_data <- function(row) {
     U <- rkhoud(as.integer(row$n), "CLA", 5, alpha)
     truth <- list(family = "CLA", theta = 5, alpha = alpha)
   } else if (scenario == "sim2") {
-    obj <- rmixture(as.integer(row$n), list(
-      list(type = "khoudraji", family = "CLA", theta = 30,
-           alpha = c(1, .95), d = 2, weight = .5),
-      list(type = "khoudraji", family = "CLA", theta = 1,
-           alpha = c(.05, 1), d = 2, weight = .5)
-    ))
+    ## Equal-theta mirror images: identical Kendall tau and identical marginal
+    ## dependence strength, differing only in the direction of asymmetry.
+    ## Every exchangeable kernel is invariant under coordinate swaps, so the
+    ## components cannot be separated by an exchangeable (nested) model.
+    comp <- function(alpha) list(type = "khoudraji", family = "CLA",
+                                 theta = 50, alpha = alpha, d = 2,
+                                 weight = .5)
+    obj <- rmixture(as.integer(row$n), list(comp(c(1, .65)), comp(c(.65, 1))))
     U <- obj$U
     truth <- list(
       z = obj$z,
       components = list(
-        list(family = "CLA", theta = 30, alpha = c(1, .95),
-             weight = .5),
-        list(family = "CLA", theta = 1, alpha = c(.05, 1),
-             weight = .5)
+        list(family = "CLA", theta = 50, alpha = c(1, .65), weight = .5),
+        list(family = "CLA", theta = 50, alpha = c(.65, 1), weight = .5)
       )
     )
   } else if (scenario == "sim3") {

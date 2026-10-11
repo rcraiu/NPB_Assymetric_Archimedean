@@ -1,0 +1,2 @@
+"job_id","scenario","family","model","n","d","lpml","m_mean","m_mode","theta_mean","acceptance_theta","acceptance_alpha","cluster_method","cluster_method_binder2","cluster_method_vi"
+"sim2_mirror_rep19_n500_CLA_free","sim2","CLA","free",500,2,431.797567197301,2.8495,2,48.7726223866229,0.697604367675437,0.350849531698593,"SALSO Binder","SALSO Binder (K<=2)","SALSO VI"

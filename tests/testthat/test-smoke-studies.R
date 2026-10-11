@@ -3,7 +3,7 @@ testthat::test_that("all four studies complete tiny smoke fits", {
     list(scenario = "sim1", truth = "0.8_0.3", n = 24L,
          family = "CLA", model = "free", data_seed = 41001L,
          fit_seed = 51001L),
-    list(scenario = "sim2", truth = "two_khoudraji", n = 24L,
+    list(scenario = "sim2", truth = "mirror_rep01", n = 24L,
          family = "CLA", model = "free", data_seed = 42001L,
          fit_seed = 52001L),
     list(scenario = "sim3", truth = "gumbel_3d", n = 24L,
