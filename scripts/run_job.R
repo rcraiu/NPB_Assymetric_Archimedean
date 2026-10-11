@@ -43,6 +43,11 @@ pars[names(cfg)[names(cfg) %in% names(pars)]] <-
   cfg[names(cfg)[names(cfg) %in% names(pars)]]
 pars$cpo_aux <- cfg$cpo_aux
 pars$alpha_fixed <- identical(row$model, "exchangeable")
+scenario_prior <- study_scenarios[[row$scenario]]$prior
+if (!is.null(scenario_prior)) {
+  ## Simulation-specific overrides are explicit in config/studies.R.
+  pars[names(scenario_prior)] <- scenario_prior
+}
 set.seed(as.integer(row$fit_seed))
 fit <- fit_khoud_pd(dat$U, row$family, pars, verbose = TRUE)
 
@@ -67,6 +72,12 @@ write.csv(summary$tau,
           row.names = FALSE)
 write.csv(summary$clusters,
           file.path(out, "summaries", paste0(job_id, "_clusters.csv")),
+          row.names = FALSE)
+write.csv(summary$clusters_binder2,
+          file.path(out, "summaries", paste0(job_id, "_clusters_binder2.csv")),
+          row.names = FALSE)
+write.csv(summary$clusters_vi,
+          file.path(out, "summaries", paste0(job_id, "_clusters_vi.csv")),
           row.names = FALSE)
 write.csv(data.frame(iteration = seq_along(fit$m), m = fit$m,
                      a = fit$a, b = fit$b),

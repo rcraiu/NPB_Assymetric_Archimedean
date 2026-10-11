@@ -15,9 +15,10 @@ Rscript scripts/make_manifest.R
 Rscript -e 'testthat::test_dir("tests/testthat")'
 ```
 
-`salso` is optional. When available, partitions use SALSO with Binder loss.
-Otherwise the code selects the retained partition minimizing squared Binder
-loss to the posterior similarity matrix (the Dahl least-squares fallback).
+`salso` is optional. When available, the code reports SALSO partitions under
+both Binder and variation-of-information (VI) loss. Otherwise it selects the
+retained partition minimizing squared Binder loss to the posterior similarity
+matrix (the Dahl least-squares fallback).
 
 ## Study manifest and deterministic data
 
@@ -27,7 +28,10 @@ exactly one deterministic data set. Each fit has its own `fit_seed`.
 
 - Simulation 1: all four alpha truths, `n=200,500`, free and exchangeable
   Clayton/Frank/Gumbel BNP kernels.
-- Simulation 2: free and exchangeable Clayton kernels.
+- Simulation 2: free and exchangeable Clayton kernels for
+  `CLA(30; 1, .95)` and `CLA(1; .05, 1)` at `n=500`. For this clustering
+  experiment only, `b+a ~ Gamma(2,10)` replaces the default `Gamma(1,20)`
+  prior.
 - Simulation 3: free and exchangeable Gumbel kernels.
 - Simulation 4: single and two-component Gaussian truths at `n=500`, with
   free and exchangeable Clayton/Frank/Gumbel kernels.
@@ -109,9 +113,10 @@ single-component maximum-likelihood comparison.
 
 - The free model recovers substantial bivariate asymmetry at `n=500`; under
   exchangeability its alpha coordinates concentrate near one.
-- In the two-component asymmetric Clayton experiment, free alpha improves LPML
-  modestly, but SALSO selects one dominant cluster rather than recovering both
-  generating groups.
+- In the revised two-component asymmetric Clayton experiment, free alpha gains
+  76.36 LPML units and the two-group Binder summary attains ARI 0.672, close to
+  the known-parameter oracle benchmark 0.712. The unconstrained VI summary is
+  more conservative and merges the free fit into one group.
 - In dimension three, free alpha recovers `(1, 0.7, 0.2)`, reproduces all three
   unequal pairwise taus, and improves LPML by 470.35.
 - For Gaussian truths, nested Frank is best. The Khoudraji layer cannot replace

@@ -11,8 +11,10 @@ study_scenarios <- list(
     n = c(200L, 500L), families = c("CLA", "FRA", "GUM"),
     models = c("free", "exchangeable")
   ),
-  sim2 = list(n = 500L, families = "CLA",
-              models = c("free", "exchangeable")),
+  sim2 = list(
+    n = 500L, families = "CLA", models = c("free", "exchangeable"),
+    prior = list(c_b = 2, d_b = 10)
+  ),
   sim3 = list(n = 1000L, families = "GUM",
               models = c("free", "exchangeable")),
   sim4 = list(n = 500L, truth = c("single", "two"),

@@ -43,6 +43,17 @@ fmt_num <- function(x, digits = 2) formatC(x, digits = digits, format = "f")
 fmt_vec <- function(x, digits = 2)
   paste0("(", paste(fmt_num(x, digits), collapse = ","), ")")
 write_tex <- function(x, name) writeLines(x, file.path(out, name))
+adjusted_rand <- function(x, y) {
+  tab <- table(x, y)
+  choose2 <- function(z) z * (z - 1) / 2
+  total <- choose2(sum(tab))
+  expected <- sum(choose2(rowSums(tab))) *
+    sum(choose2(colSums(tab))) / total
+  upper <- .5 * (sum(choose2(rowSums(tab))) +
+                   sum(choose2(colSums(tab))))
+  if (upper == expected) return(1)
+  (sum(choose2(tab)) - expected) / (upper - expected)
+}
 
 ## Simulation 1: all sample sizes, truths, and kernel families.
 truths <- c("1_1", "0.8_0.3", "0.4_0.4", "0_0")
@@ -93,37 +104,66 @@ write_tex(c(
 ## Simulation 2.
 sim2_rows <- character()
 sim2_csv <- list()
+sim2_cluster_rows <- character()
 for (model in c("exchangeable", "free")) {
   id <- paste0("sim2_two_khoudraji_n500_CLA_", model)
   s <- read_summary(id)
-  al <- s$alpha$mean
   pred <- tau_matrix(s)[2, 1]
-  cl <- s$clusters[which.max(s$clusters$size), ]
+  ari_binder <- adjusted_rand(s$partition, s$truth$z)
+  ari_binder2 <- adjusted_rand(s$partition_binder2, s$truth$z)
+  ari_vi <- adjusted_rand(s$partition_vi, s$truth$z)
   sim2_rows <- c(sim2_rows, sprintf(
-    "%s & %.2f & %.2f & %d & %.2f & %s & %.3f \\\\",
+    "%s & %.2f & %.2f & %d & %.2f & %.2f & %d & %.2f & %.3f \\\\",
     if (model == "free") "Free" else "Nested",
-    s$summary$lpml, s$summary$m_mean, s$summary$m_mode,
-    cl$theta_mean, fmt_vec(as.numeric(cl[, c("1", "2")])), pred
+    s$summary$lpml, s$summary$m_mean,
+    nrow(s$clusters), ari_binder, ari_binder2,
+    nrow(s$clusters_vi), ari_vi, pred
   ))
   sim2_csv[[model]] <- data.frame(
     model = model, lpml = s$summary$lpml, m_mean = s$summary$m_mean,
-    m_mode = s$summary$m_mode, salso_clusters = nrow(s$clusters),
-    largest_cluster_size = cl$size, largest_theta = cl$theta_mean,
-    largest_alpha1 = al[1], largest_alpha2 = al[2],
+    m_mode = s$summary$m_mode,
+    binder_clusters = nrow(s$clusters), binder_ari = ari_binder,
+    binder2_ari = ari_binder2,
+    vi_clusters = nrow(s$clusters_vi), vi_ari = ari_vi,
     tau_empirical = s$empirical_tau[1, 2], tau_predictive = pred
   )
+  if (model == "free") {
+    for (partition_name in c("Binder $K\\leq2$", "VI")) {
+      clusters <- if (partition_name == "Binder $K\\leq2$")
+        s$clusters_binder2 else s$clusters_vi
+      sim2_cluster_rows <- c(sim2_cluster_rows, vapply(
+        seq_len(nrow(clusters)),
+        function(i) sprintf(
+          "%s & %d & %d & %.2f & %s \\\\",
+          partition_name, clusters$cluster[i], clusters$size[i],
+          clusters$theta_mean[i],
+          fmt_vec(as.numeric(clusters[i, c("1", "2")]))
+        ),
+        character(1)
+      ))
+    }
+  }
 }
 write.csv(do.call(rbind, sim2_csv), file.path(out, "table_sim2.csv"),
           row.names = FALSE)
 write_tex(c(
-  "\\begin{tabular}{lrrrrrr}",
+  "\\begin{tabular}{lrrrrrrrr}",
   "\\hline\\hline",
-  "Model & LPML & $E(m\\mid\\bu)$ & mode$(m)$ & $\\bar\\theta_1$ & $\\bar\\balpha_1$ & $\\tau_{\\rm pp}$ \\\\",
+  "Model & LPML & $E(m\\mid\\bu)$ & $K_B$ & ARI$_B$ & ARI$_{B,2}$ & $K_V$ & ARI$_V$ & $\\tau_{\\rm pp}$ \\\\",
   "\\hline",
   sim2_rows,
   "\\hline\\hline",
   "\\end{tabular}"
 ), "table_sim2.tex")
+write_tex(c(
+  "\\begin{tabular}{lrrrr}",
+  "\\hline\\hline",
+  "Partition & Cluster & Size & $\\bar\\theta$ & $\\bar\\balpha$ \\\\",
+  "\\hline",
+  sim2_cluster_rows,
+  "\\hline\\hline",
+  "\\end{tabular}"
+), "table_sim2_clusters.tex")
 
 ## Simulation 3.
 sim3_rows <- character()

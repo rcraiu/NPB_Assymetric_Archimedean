@@ -14,13 +14,21 @@ generate_study_data <- function(row) {
     truth <- list(family = "CLA", theta = 5, alpha = alpha)
   } else if (scenario == "sim2") {
     obj <- rmixture(as.integer(row$n), list(
-      list(type = "khoudraji", family = "CLA", theta = 10,
-           alpha = c(1, .2), d = 2, weight = .5),
-      list(type = "khoudraji", family = "CLA", theta = 2,
-           alpha = c(.2, 1), d = 2, weight = .5)
+      list(type = "khoudraji", family = "CLA", theta = 30,
+           alpha = c(1, .95), d = 2, weight = .5),
+      list(type = "khoudraji", family = "CLA", theta = 1,
+           alpha = c(.05, 1), d = 2, weight = .5)
     ))
     U <- obj$U
-    truth <- list(z = obj$z, components = "CLA(10;1,.2)+CLA(2;.2,1)")
+    truth <- list(
+      z = obj$z,
+      components = list(
+        list(family = "CLA", theta = 30, alpha = c(1, .95),
+             weight = .5),
+        list(family = "CLA", theta = 1, alpha = c(.05, 1),
+             weight = .5)
+      )
+    )
   } else if (scenario == "sim3") {
     U <- rkhoud(as.integer(row$n), "GUM", 4, c(1, .7, .2))
     truth <- list(family = "GUM", theta = 4, alpha = c(1, .7, .2))

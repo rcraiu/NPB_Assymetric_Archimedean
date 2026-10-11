@@ -7,7 +7,13 @@ root <- normalizePath(file.path(dirname(script), ".."))
 dir <- file.path(root, "results", mode, "summaries")
 files <- list.files(dir, "_summary[.]csv$", full.names = TRUE)
 if (!length(files)) stop("No summaries in ", dir)
-tab <- do.call(rbind, lapply(files, read.csv, stringsAsFactors = FALSE))
+parts <- lapply(files, read.csv, stringsAsFactors = FALSE)
+columns <- unique(unlist(lapply(parts, names)))
+parts <- lapply(parts, function(x) {
+  x[setdiff(columns, names(x))] <- NA
+  x[columns]
+})
+tab <- do.call(rbind, parts)
 write.csv(tab, file.path(root, "results", mode, "all_jobs.csv"),
           row.names = FALSE)
 

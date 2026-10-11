@@ -14,20 +14,47 @@ binder_loss <- function(z, P) {
   sum((same[upper.tri(same)] - P[upper.tri(P)])^2)
 }
 
-select_partition <- function(z_draws, P = posterior_similarity(z_draws)) {
+select_partition <- function(z_draws, P = posterior_similarity(z_draws),
+                             loss = c("binder", "vi"),
+                             max_n_clusters = 0L) {
+  loss <- match.arg(loss)
   z_draws <- as.matrix(z_draws)
-  method <- "Dahl least-squares/Binder fallback"
+  method <- paste("Dahl least-squares fallback for", toupper(loss))
   zhat <- NULL
   if (requireNamespace("salso", quietly = TRUE)) {
     zhat <- tryCatch(
-      salso::salso(z_draws, loss = salso::binder()),
+      salso::salso(
+        z_draws,
+        loss = if (loss == "binder") salso::binder() else salso::VI(),
+        maxNClusters = as.integer(max_n_clusters)
+      ),
       error = function(e) NULL
     )
-    if (!is.null(zhat)) method <- "SALSO Binder"
+    if (!is.null(zhat)) {
+      method <- paste("SALSO", if (loss == "binder") "Binder" else "VI")
+      if (max_n_clusters > 0)
+        method <- paste0(method, " (K<=", max_n_clusters, ")")
+    }
   }
   if (is.null(zhat)) {
-    losses <- apply(z_draws, 1, binder_loss, P = P)
-    zhat <- z_draws[which.min(losses), ]
+    candidates <- seq_len(nrow(z_draws))
+    if (max_n_clusters > 0) {
+      candidates <- candidates[
+        apply(z_draws, 1, function(z) length(unique(z))) <= max_n_clusters
+      ]
+    }
+    if (length(candidates)) {
+      losses <- apply(z_draws[candidates, , drop = FALSE], 1,
+                      binder_loss, P = P)
+      zhat <- z_draws[candidates[which.min(losses)], ]
+    } else {
+      zhat <- stats::cutree(
+        stats::hclust(stats::as.dist(1 - P), method = "average"),
+        k = max_n_clusters
+      )
+      method <- paste0("PSM average-linkage fallback (K<=",
+                       max_n_clusters, ")")
+    }
   }
   list(partition = as.integer(factor(zhat)), method = method, psm = P)
 }
@@ -101,7 +128,10 @@ fit_single_khoud <- function(U, family, alpha_fixed = FALSE) {
 }
 
 compact_summary <- function(fit, scenario, job_id, tau_n = 2000L, seed = 1L) {
-  cl <- select_partition(fit$z)
+  P <- posterior_similarity(fit$z)
+  cl <- select_partition(fit$z, P, "binder")
+  cl_binder2 <- select_partition(fit$z, P, "binder", 2L)
+  cl_vi <- select_partition(fit$z, P, "vi")
   tau <- posterior_predictive_tau(fit, tau_n, seed)
   list(
     summary = data.frame(
@@ -113,7 +143,9 @@ compact_summary <- function(fit, scenario, job_id, tau_n = 2000L, seed = 1L) {
       theta_mean = mean(fit$th),
       acceptance_theta = fit$acceptance["theta"],
       acceptance_alpha = fit$acceptance["alpha"],
-      cluster_method = cl$method
+      cluster_method = cl$method,
+      cluster_method_binder2 = cl_binder2$method,
+      cluster_method_vi = cl_vi$method
     ),
     alpha = data.frame(coordinate = seq_len(ncol(fit$U)),
                        mean = apply(fit$al, 3, mean),
@@ -121,8 +153,12 @@ compact_summary <- function(fit, scenario, job_id, tau_n = 2000L, seed = 1L) {
                        q975 = apply(fit$al, 3, quantile, .975)),
     tau = as.data.frame(as.table(tau)),
     clusters = cluster_summary(fit, cl$partition),
+    clusters_binder2 = cluster_summary(fit, cl_binder2$partition),
+    clusters_vi = cluster_summary(fit, cl_vi$partition),
     partition = cl$partition,
-    psm = cl$psm
+    partition_binder2 = cl_binder2$partition,
+    partition_vi = cl_vi$partition,
+    psm = P
   )
 }
 
