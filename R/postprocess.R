@@ -138,6 +138,7 @@ compact_summary <- function(fit, scenario, job_id, tau_n = 2000L, seed = 1L) {
       job_id = job_id, scenario = scenario, family = fit$family,
       model = if (fit$alpha_fixed) "exchangeable" else "free",
       n = nrow(fit$U), d = ncol(fit$U), lpml = fit$lpml,
+      lpml_loo_predictive = fit$lpml_loo_predictive,
       m_mean = mean(fit$m),
       m_mode = as.integer(names(sort(table(fit$m), decreasing = TRUE)[1])),
       theta_mean = mean(fit$th),
@@ -216,7 +217,7 @@ clustering_metrics <- function(fit, truth_z, P, partition, partition_binder2,
   )
 }
 
-## Component-specific CPO / LPML (Pan et al., 2025) recomputed from stored
+## Primary CPO / LPML estimator (Pan et al., 2025) recomputed from stored
 ## draws: CPO_i = [mean_l 1 / c_{xi_i^(l)}(u_i)]^{-1}.  Works on any fit that
 ## stores the per-observation atoms (fit$th, fit$al), including older fits.
 lpml_component <- function(fit) {

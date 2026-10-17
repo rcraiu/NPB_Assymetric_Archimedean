@@ -1,4 +1,4 @@
-"tag","family","model","seed","lpml_comp","lpml_loo","m_mode","alpha","theta_mean","seconds","last_adapted","burn"
+"tag","family","model","seed","lpml","lpml_loo","m_mode","alpha","theta_mean","seconds","last_adapted","burn"
 "occ","AMH","exchangeable",1,76.6896560692138,76.6994562260923,1,"1.00,1.00",0.988554012048389,228.32,5000,5000
 "occ","AMH","exchangeable",2,76.7684152451762,76.7556008856632,1,"1.00,1.00",0.989102939677167,218.594,5000,5000
 "occ","AMH","exchangeable",3,76.7149047854896,76.720322048271,1,"1.00,1.00",0.989067925730663,230.529,5000,5000

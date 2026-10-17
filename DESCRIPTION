@@ -1,12 +1,15 @@
 Package: KhoudrajiBNPRepro
 Type: Project
-Title: Reproducibility Stack for Asymmetric Archimedean BNP Mixtures
+Title: Reproducibility Materials for Bayesian Nonparametric Mixtures of Asymmetric Archimedean Copulas
 Version: 0.1.0
 Authors@R: c(person("Radu", "Craiu", role = c("aut", "cre"),
-                    email = "radu.craiu@utoronto.ca"))
+                    email = "radu.craiu@utoronto.ca"),
+             person("Luis", "Nieto-Barajas", role = "aut"))
 Description: Simulation, inference, diagnostics, clustering, and manuscript
-    outputs for Sections 4.1--4.4 of the asymmetric Archimedean copula study.
-License: MIT
+    outputs for Section 4 (simulation studies and occupancy and red-wine
+    analyses) of "Bayesian nonparametric mixtures of asymmetric Archimedean
+    copulas" by Craiu and Nieto-Barajas.
+License: MIT + file LICENSE
 Encoding: UTF-8
 Imports:
     copula,

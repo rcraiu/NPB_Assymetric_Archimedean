@@ -61,7 +61,7 @@ run_one <- function(j) {
   keep <- unique(round(seq(1, nrow(fit$th), length.out = min(nrow(fit$th), 400))))
   res <- list(
     id = id, job = j, seconds = unname(proc.time()[3] - t0),
-    lpml_comp = fit$lpml_comp, lpml_loo_predictive = fit$lpml,
+    lpml = fit$lpml, lpml_loo_predictive = fit$lpml_loo_predictive,
     m = table(fit$m), m_mean = mean(fit$m),
     alpha_mean = apply(fit$al, 3, mean),
     alpha_q = apply(fit$al, 3, quantile, probs = c(.025, .5, .975)),
@@ -71,8 +71,8 @@ run_one <- function(j) {
     th_keep = fit$th[keep, , drop = FALSE],
     al_keep = fit$al[keep, , , drop = FALSE], pars = fit$pars)
   saveRDS(res, done)
-  message(sprintf("%s: LPML(component)=%.2f LPML(LOO predictive)=%.2f  %.0fs",
-                  id, res$lpml_comp, res$lpml_loo_predictive, res$seconds))
+  message(sprintf("%s: LPML=%.2f (LOO-predictive variant %.2f)  %.0fs",
+                  id, res$lpml, res$lpml_loo_predictive, res$seconds))
   id
 }
 ## longest jobs (wine) first

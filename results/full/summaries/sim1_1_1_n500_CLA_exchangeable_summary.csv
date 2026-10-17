@@ -1,2 +1,2 @@
-"job_id","scenario","family","model","n","d","lpml","m_mean","m_mode","theta_mean","acceptance_theta","acceptance_alpha","cluster_method"
-"sim1_1_1_n500_CLA_exchangeable","sim1","CLA","exchangeable",500,2,491.947883533955,1.451,1,4.69924760896222,0.458791476111706,0,"SALSO Binder"
+"job_id","scenario","family","model","n","d","lpml","m_mean","m_mode","theta_mean","acceptance_theta","acceptance_alpha","cluster_method","lpml_loo_predictive"
+"sim1_1_1_n500_CLA_exchangeable","sim1","CLA","exchangeable",500,2,491.912444898345,1.451,1,4.69924760896222,0.458791476111706,0,"SALSO Binder",491.947883533955

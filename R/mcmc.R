@@ -239,7 +239,7 @@ fit_khoud_pd <- function(U, family, pars = NULL, verbose = TRUE) {
       for (k in seq_len(m))
         comp_d[, k] <- exp(log_d_khoud(U, th_star[k], al_star[k, ], family))
       ## Component-specific density c_{xi_i}(u_i) at the current atom of i; its
-      ## harmonic mean is the exact CPO identity used by Pan et al. (2025).
+      ## harmonic mean is the CPO estimator of Pan et al. (2025).
       comp_dens[kidx, ] <- comp_d[cbind(seq_len(n), z)]
       for (i in seq_len(n)) {
         cc <- counts
@@ -257,11 +257,16 @@ fit_khoud_pd <- function(U, family, pars = NULL, verbose = TRUE) {
                       it, pars$n_iter, m))
   }
 
-  cpo <- 1 / colMeans(1 / pmax(pred_dens, 1e-300))
-  cpo_comp <- 1 / colMeans(1 / pmax(comp_dens, 1e-300))
+  ## Primary estimator (Pan et al., 2025): CPO_i = [mean_l 1/c_{xi_i^(l)}(u_i)]^{-1},
+  ## using the density of observation i under its own current atom.
+  cpo <- 1 / colMeans(1 / pmax(comp_dens, 1e-300))
+  ## Secondary estimator: harmonic mean of leave-one-out PD predictive
+  ## densities (sensitivity check; see README).
+  cpo_loo <- 1 / colMeans(1 / pmax(pred_dens, 1e-300))
   list(family = family, alpha_fixed = alpha_fixed,
        lpml = sum(log(pmax(cpo, 1e-300))), cpo = cpo,
-       lpml_comp = sum(log(pmax(cpo_comp, 1e-300))), cpo_comp = cpo_comp,
+       lpml_loo_predictive = sum(log(pmax(cpo_loo, 1e-300))),
+       cpo_loo_predictive = cpo_loo,
        tuning_trace = tuning_trace,
        adaptation = list(finite = TRUE, last_adapted_iteration = if (nrow(tuning_trace))
          max(tuning_trace[, "iteration"]) else 0L, burn = pars$burn,
@@ -269,7 +274,9 @@ fit_khoud_pd <- function(U, family, pars = NULL, verbose = TRUE) {
        th = keep_th, al = keep_al, z = keep_z,
        a = keep_a, b = keep_b, m = keep_m, U = U, pars = pars,
        acceptance = total_accepted / pmax(total_attempted, 1),
-       cpo_method = paste0("harmonic mean of leave-one-out PD predictive ",
-                           "densities; G0 integral uses ", cpo_aux,
-                           " Monte Carlo draws per retained state"))
+       cpo_method = paste0("harmonic mean of the component-specific density ",
+                           "c_{xi_i}(u_i) over retained draws (Pan et al., 2025)"),
+       cpo_loo_method = paste0("harmonic mean of leave-one-out PD predictive ",
+                               "densities; G0 integral uses ", cpo_aux,
+                               " Monte Carlo draws per retained state"))
 }

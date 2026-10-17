@@ -40,7 +40,7 @@ testthat::test_that("tuning constants adapt only during burn-in (finite adaptati
   testthat::expect_equal(unname(fit$adaptation$final_kappa),
                          unname(tr[nrow(tr), c("kappa_theta", "kappa_alpha",
                                                "kappa_a", "kappa_b")]))
-  ## component-specific LPML is finite and recomputable from the stored draws
-  testthat::expect_true(is.finite(fit$lpml_comp))
-  testthat::expect_equal(lpml_component(fit)$lpml, fit$lpml_comp, tolerance = 1e-6)
+  ## the (component-specific) LPML is recomputable from the stored draws
+  testthat::expect_true(is.finite(fit$lpml_loo_predictive))
+  testthat::expect_equal(lpml_component(fit)$lpml, fit$lpml, tolerance = 1e-6)
 })

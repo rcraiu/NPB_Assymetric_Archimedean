@@ -1,172 +1,231 @@
-# Asymmetric Archimedean BNP reproducibility stack
+# Bayesian nonparametric mixtures of asymmetric Archimedean copulas: code and reproducibility materials
 
-This repository reproduces manuscript Sections 4.1--4.4. It provides exact
-Khoudraji simulation, a Poisson--Dirichlet sampler, deterministic study jobs,
-compact summaries, clustering, contour comparisons, and the tables and figures
-used in the revised manuscript.
+Supplementary code for
 
-## Setup and checks
+> Craiu, R. V. and Nieto-Barajas, L. E. *Bayesian nonparametric mixtures of
+> asymmetric Archimedean copulas.* Submitted to *Bayesian Analysis*.
 
-Run commands from the repository root:
+The repository contains everything needed to reproduce Section 4 of the paper:
+the four simulation studies (Sections 4.1--4.4) and the occupancy and red-wine
+analyses (Section 4.5). It provides exact simulation from Khoudraji-transformed
+Archimedean copulas, a compiled likelihood, the Poisson--Dirichlet mixture
+sampler, deterministic job manifests with fixed seeds, posterior summaries
+(clustering, Kendall's tau, LPML), and the scripts that produce every table and
+figure of Section 4.
+
+## Model in one paragraph
+
+Each observation `u_i` in `(0,1)^d` (`d = 2, 3`) has density `c_xi(u_i)` where
+`xi = (theta, alpha)`; `c_xi` is the density of the Khoudraji transform of an
+Archimedean copula `C_theta` (Clayton, Frank, Gumbel, Joe or AMH) with
+coordinate-wise powers `alpha in [0,1]^d`. The atoms `xi` follow a
+Poisson--Dirichlet process `PD(a, b; G0)` with `G0 = g0(theta) x Beta(c_alpha, d_alpha)^d`.
+Setting `alpha = 1` recovers the exchangeable mixture of Pan, Nieto-Barajas and
+Craiu (2025), which is therefore a special case of the code. Inference uses
+Neal's Algorithm 8 with Metropolis--Hastings updates for the atoms and for
+`(a, b)` through the exchangeable partition probability function.
+
+### Terminology
+
+The manuscript calls the `alpha = 1` model **Exchangeable** and the model with
+estimated `alpha` **Khoudraji**. In file names, job identifiers and the
+manifest, the Khoudraji model carries the suffix `free` and the exchangeable
+model the suffix `exchangeable`; the real-data scripts use `khoudraji` and
+`exchangeable`.
+
+## Requirements
+
+- R >= 4.3 (developed and run with R 4.4.2) and a C++ toolchain compatible with
+  `Rcpp` (the likelihood in `src/khoudraji_dens.cpp` is compiled on first load
+  with `Rcpp::sourceCpp`).
+- R packages: `Rcpp`, `copula`, `mvtnorm`, `testthat`; optional `salso` (SALSO
+  partition search under Binder and variation-of-information loss; without it a
+  documented least-squares Binder fallback on the posterior similarity matrix is
+  used).
 
 ```sh
-Rscript scripts/install_dependencies.R
-Rscript scripts/make_manifest.R
+Rscript scripts/install_dependencies.R      # installs packages, records sessionInfo
 Rscript -e 'testthat::test_dir("tests/testthat")'
 ```
 
-`salso` is optional. When available, the code reports SALSO partitions under
-both Binder and variation-of-information (VI) loss. Otherwise it selects the
-retained partition minimizing squared Binder loss to the posterior similarity
-matrix (the Dahl least-squares fallback).
+All commands in this document are run from the repository root. The reference
+results were produced on an Apple M1 Max (macOS, R 4.4.2) using independent
+`Rscript` processes in parallel.
 
-## Study manifest and deterministic data
+## Repository layout
 
-`config/job_manifest.csv` is explicit and resumable. Models sharing a
-scenario/truth/sample-size setting have the same `data_seed`, so they fit
-exactly one deterministic data set. Each fit has its own `fit_seed`.
+| Path | Content |
+|---|---|
+| `R/khoudraji_bnp.R` | Archimedean families, parameter spaces, centering measure `G0`, Khoudraji density wrappers |
+| `R/mcmc.R` | Poisson--Dirichlet mixture sampler (`fit_khoud_pd`), finite adaptation, LPML |
+| `R/simulation.R`, `R/studies.R` | Exact Khoudraji simulation; data generation for Simulations 1--4 |
+| `R/postprocess.R` | Posterior predictive, Kendall tau, SALSO/Binder/VI clustering, ARI, `lpml_component()` |
+| `R/real_data.R` | Preparation of the occupancy and red-wine data |
+| `src/khoudraji_dens.cpp` | Compiled copula and Khoudraji densities for `d = 2, 3` |
+| `config/studies.R`, `config/job_manifest.csv` | Study settings and the explicit list of 102 simulation fits with data and fit seeds |
+| `scripts/` | Entry points (see below) |
+| `data/real/` | Occupancy and red-wine data (see *Data*) |
+| `tests/testthat/` | Unit tests (copula identities, Khoudraji limits, finite adaptation, smoke fits) |
+| `results/full/` | Completed simulation results (compact summaries, figures, manuscript tables) |
+| `results/real/full/` | Completed real-data summaries (CSV) |
 
-- Simulation 1: all four alpha truths, `n=200,500`, free and exchangeable
-  Clayton/Frank/Gumbel BNP kernels.
-- Simulation 2: free and exchangeable Clayton kernels on 20 seeded data sets
-  (`mirror_rep01`--`mirror_rep20`, `n=500`) from the mirror-asymmetric mixture
-  `0.5 CLA(50; 1, .65) + 0.5 CLA(50; .65, 1)`. The components share `theta`
-  and Kendall tau and differ only in the direction of asymmetry, so no
-  exchangeable kernel can separate them. For this experiment only,
-  `theta ~ Gamma(4, .08)` and `b+a ~ Gamma(2,10)` replace the defaults.
-  Each job stores recovery metrics against the generating labels (ARI of the
-  Binder, Binder `K<=2`, VI and PSM-cut partitions, per-draw ARI, and
-  within/between posterior similarity). Replicate 1 is the featured data set.
-- Simulation 3: free and exchangeable Gumbel kernels.
-- Simulation 4: single and two-component Gaussian truths at `n=500`, with
-  free and exchangeable Clayton/Frank/Gumbel kernels.
+Full fitted chains are large and excluded from version control (`results/*/raw/`,
+`results/real/*/*.rds`); they are regenerated by the commands below.
 
-Smoke mode uses 24 iterations (8 burn-in, thin 4). Full mode uses exactly
-15,000 iterations (5,000 burn-in, thin 5). To smoke one representative job
-from every study:
+## Reproducing the paper
+
+### 1. Simulation studies (Sections 4.1--4.4)
 
 ```sh
-Rscript scripts/run_manifest.R --mode smoke --subset studies --workers 4
-```
-
-To run the complete production study:
-
-```sh
-Rscript scripts/run_manifest.R --mode full --subset all --workers 4
+Rscript scripts/make_manifest.R                                   # writes config/job_manifest.csv
+Rscript scripts/run_manifest.R --mode smoke --subset studies --workers 4   # 1 quick job per study
+Rscript scripts/run_manifest.R --mode full  --subset all     --workers 8   # 102 production fits
 Rscript scripts/aggregate_results.R full
-Rscript scripts/manuscript_results.R
+Rscript scripts/manuscript_results.R                              # tables and figures
 ```
 
-Each worker is an independent `Rscript` process. This avoids inheriting a
-`sourceCpp` DLL through a fork. Existing completed summary RDS files are
-skipped; use `--force` to rerun.
+Each job is an independent `Rscript` process and is resumable: completed
+summaries are skipped unless `--force` is given. Smoke mode uses 24 iterations;
+full mode uses 15,000 iterations, burn-in 5,000, thinning 5 (2,000 retained
+draws), the settings of the manuscript.
 
-## Outputs
+| Study | Truth | Fits |
+|---|---|---|
+| Simulation 1 | Clayton-Khoudraji, `theta = 5`, `alpha` in `{(1,1),(.8,.3),(.4,.4),(0,0)}`, `n = 200, 500` | Clayton/Frank/Gumbel kernels, Exchangeable and Khoudraji |
+| Simulation 2 | Mirror-asymmetric mixture `0.5 CLA(50; 1, .65) + 0.5 CLA(50; .65, 1)`, `n = 500`, 20 seeded data sets | Clayton, Exchangeable and Khoudraji. `theta ~ Gamma(4, .08)` and `b + a ~ Gamma(2, 10)` for this study only |
+| Simulation 3 | 3-d Gumbel-Khoudraji, `theta = 4`, `alpha = (1, .7, .2)`, `n = 1000` | Gumbel, Exchangeable and Khoudraji |
+| Simulation 4 | Gaussian copula `rho = .7`; mixture of Gaussian copulas `rho in {-.7, .7}`; `n = 500` | Clayton/Frank/Gumbel, Exchangeable and Khoudraji |
 
-Outputs are under `results/{smoke,full}/`. The repository includes the
-completed compact `full` results; full fitted chains are deliberately excluded.
+Models fitted to the same scenario share one deterministic data set
+(`data_seed`); every fit has its own `fit_seed`.
 
-- `raw/`: full fitted chains (ignored by git);
-- `summaries/`: compact RDS and CSV files for LPML, alpha/theta, pairwise
-  posterior-predictive tau, and clusters;
-- `diagnostics/`: traces and acceptance information;
-- `figures/`: observed/predictive contour PDFs for bivariate jobs;
-- `latex/`: per-job and aggregate table fragments.
-- `manuscript/`: the four final tables and comparison figures used in Sections
-  4.1--4.4.
-
-The retained allocation vector `z` is stored at every saved iteration. The
-posterior similarity matrix and selected partition are included in each
-compact RDS.
-
-## Statistical implementation notes
-
-The exact product construction is
-
-`Z_j = max(X_j^(1/alpha_j), Y_j^(1/(1-alpha_j)))`,
-
-where `X` is sampled from the inner Archimedean copula using `copula` and the
-`Y_j` are independent uniforms. Alpha zero returns `Y_j` exactly and alpha one
-returns `X_j` exactly.
-
-Parameter support is dimension-aware. The fitted Clayton kernel is restricted
-to positive theta in every dimension because this repository uses the
-absolutely continuous strict-generator density; negative bivariate Clayton
-has a singular boundary component. Frank must be positive above dimension
-two but permits either sign in dimension two; Gumbel and Joe require theta at
-least one. Theta and alpha have separate MH decisions and acceptance diagnostics.
-The theta random walk includes the truncated-uniform Hastings correction.
-Batch adaptation is diminishing and stops after burn-in. The transformed
-update for `b+a` enforces `b > -a`.
-
-LPML uses a full leave-one-out Poisson--Dirichlet predictive density at each
-retained state:
-
-`[sum_k (n_{-i,k}-a)c_k(u_i) + (b+a*m_{-i}) m0(u_i)] / (b+n-1)`.
-
-The base density `m0` is Monte Carlo integrated under `G0`; the number of
-draws is recorded in `cpo_method`. CPO uses the harmonic mean of those
-full-mixture ordinates. This is more expensive but avoids evaluating only the
-atom occupied by observation `i`.
-
-Posterior-predictive tau is computed from draws from the complete predictive
-mixture. Consequently it includes the cross-component terms (`k != j`) in the
-mixture Kendall-tau formula. `fit_single_khoud()` supplies the optional
-single-component maximum-likelihood comparison.
-
-## Main simulation findings
-
-- The free model recovers substantial bivariate asymmetry at `n=500`; under
-  exchangeability its alpha coordinates concentrate near one.
-- In the revised two-component asymmetric Clayton experiment, free alpha gains
-  76.36 LPML units and the two-group Binder summary attains ARI 0.672, close to
-  the known-parameter oracle benchmark 0.712. The unconstrained VI summary is
-  more conservative and merges the free fit into one group.
-- In dimension three, free alpha recovers `(1, 0.7, 0.2)`, reproduces all three
-  unequal pairwise taus, and improves LPML by 470.35.
-- For Gaussian truths, nested Frank is best. The Khoudraji layer cannot replace
-  a generator capable of representing both positive and negative dependence.
-
-## Scope and caveats
-
-The compiled full likelihood is implemented for dimensions two and three,
-which covers the four studies. Numerical tau integration can be slower near
-parameter boundaries; Monte Carlo tau is available as a validated
-alternative. The base-measure part of CPO and posterior-predictive tau are
-Monte Carlo approximations with deterministic seeds. Clayton is restricted to
-positive theta because its negative bivariate form contains a singular boundary
-component that is outside the absolutely continuous likelihood implemented
-here.
-
-## Legacy Simulation 2 (manuscript v2)
-
-The earlier single-data-set Simulation 2 (`CLA(30; 1, .95)` and
-`CLA(1; .05, 1)`) is archived, with its summaries and figures, under
-`results/full/legacy_v2_sim2/` (fitted chains excluded). It is no longer in
-the job manifest and no longer feeds the manuscript tables.
-
-## Real-data refits (occupancy and red wine)
+### 2. Real data (Section 4.5)
 
 ```sh
 Rscript scripts/run_real_data.R --mode full --cores 9 --seeds 1,2,3
 Rscript scripts/real_data_tables.R
 ```
 
-Uses the same sampler as Simulations 1--4. Data are in `data/real/`
-(Candanedo and Feldheim occupancy; Cortez et al. red wine). Exchangeable
-(`alpha = 1`) fits are run for three seeds; Khoudraji fits for seed 1.
-`results/real/full/real_data_summary.csv` holds the LPML summaries.
+Each Exchangeable model is run with three independent seeds, and each
+Khoudraji model with seed 1 (28 fits). On the reference machine the occupancy
+fits take about 4--6 minutes and the red-wine fits 29--53 minutes each.
+Results are written to `results/real/full/`:
+`real_data_all_fits.csv` (every chain) and `real_data_summary.csv` (mean,
+standard deviation and range of LPML over seeds, posterior mode of the number of
+components, posterior mean of `alpha`).
 
-## Sampler conventions
+### 3. Map from manuscript to output files
 
-- **Finite adaptation.** The MH tuning constants are updated in batches of 50
-  iterations only while `it <= burn` (step `min(.05, j^-0.6)`, target
-  acceptance .35); they are frozen afterwards. `fit$tuning_trace` and
-  `fit$adaptation` record this, and `tests/testthat` checks it.
-- **LPML.** `fit$lpml` is the harmonic mean of leave-one-out PD predictive
-  densities (used in Simulations 1--4); `fit$lpml_comp` is the
-  component-specific harmonic mean of Pan et al. (2025) (used for the
-  real-data tables). `lpml_component()` recomputes the latter from stored
-  draws; `results/full/summaries/lpml_both_estimators.csv` compares both.
-- Plot labels use "Exchangeable" and "Khoudraji"; `scripts/regenerate_job_figures.R`
-  rebuilds the per-job PDFs from stored raw fits.
+| Manuscript | File |
+|---|---|
+| Table 1 (Simulation 1) | `results/full/manuscript/table_sim1.{tex,csv}` |
+| Tables 2, 3 (Simulation 2, replicate 1) | `table_sim2_mirror.tex`, `table_sim2_mirror_clusters.tex` |
+| Table 4 (Simulation 2, 20 data sets) | `table_sim2_replicates.{tex,csv}` |
+| Table 5 (Simulation 3) | `table_sim3.{tex,csv}` |
+| Table 6 (Simulation 4) | `table_sim4.{tex,csv}` |
+| Tables 7, 8 (occupancy, red wine) | `results/real/full/real_data_summary.csv` |
+| Figure 1 | `figure_sim2_mirror.pdf` |
+| Figure 2 | `figure_sim2_replicates.pdf` |
+| Figure 3 (a, b) | `figure_sim4_single.pdf`, `figure_sim4_two.pdf` |
+
+Per-fit summaries (`summaries/`), traces and acceptance rates (`diagnostics/`),
+contour comparisons for every bivariate fit (`figures/`), and per-fit table
+fragments (`latex/`) are in `results/full/`. `scripts/regenerate_job_figures.R`
+rebuilds the per-fit figures from stored chains.
+
+## Implementation notes
+
+**Parameter spaces.** The compiled density is the absolutely continuous
+strict-generator density. Clayton therefore requires `theta > 0` in every
+dimension, Frank requires `theta > 0` for `d = 3` (either sign for `d = 2`),
+and Gumbel and Joe require `theta >= 1`. Unbounded supports are truncated at
+`theta = 80` in the proposal.
+
+**MCMC updates.** For each cluster, `theta` is updated by a truncated-uniform
+random walk (with the Hastings width correction) and `alpha` by a logit-scale
+Gaussian random walk, each with its own acceptance decision. The pair `(a, b)`
+is updated by a truncated-uniform step for `a` and a log-scale random walk for
+`b + a`, using the exchangeable partition probability function of the
+Poisson--Dirichlet process.
+
+**Finite adaptation.** The four tuning constants are adapted in batches of 50
+iterations *only during burn-in*: after batch `j` each is multiplied by
+`exp(+-delta_j)`, `delta_j = min(0.05, j^(-0.6))`, upward if the batch
+acceptance rate exceeds 0.35 and downward otherwise. They are frozen at the end
+of burn-in, so the retained draws come from a fixed-kernel Markov chain. Every
+fit records `fit$tuning_trace` and `fit$adaptation`
+(`last_adapted_iteration <= burn`); a unit test verifies this.
+
+**LPML.** `fit$lpml` is the estimator of Pan et al. (2025),
+
+`CPO_i = [ (1/L) sum_l 1 / c_{xi_i^(l)}(u_i) ]^(-1)`,  `LPML = sum_i log CPO_i`,
+
+where `xi_i^(l)` is the atom of observation `i` at retained draw `l`. This
+estimator is used for all tables, which makes our values directly comparable
+with those published by Pan et al. As a sensitivity check each fit also stores
+`fit$lpml_loo_predictive`, the harmonic mean of leave-one-out
+Poisson--Dirichlet predictive densities (base measure integrated with 12 Monte
+Carlo draws). The two agree to within 3 LPML units in 99 of the 102 simulation
+fits (`results/full/summaries/lpml_both_estimators.csv`). The secondary
+quantity is computed in the same loop so that the random-number stream, and
+hence every chain, is unaffected by the choice of primary estimator;
+`lpml_component()` recomputes the primary estimator from stored draws.
+`scripts/migrate_lpml_estimator.R` documents how the first release of the
+simulation summaries, which used the predictive-density estimator as `lpml`, was
+migrated to the current convention without re-running any chain.
+
+**Posterior-predictive Kendall's tau** is computed from draws of pairs of
+observations from the complete predictive mixture, so it includes the
+cross-component terms of the mixture-tau formula in the paper.
+
+**Clustering.** Partitions are summarised by SALSO under Binder loss (also
+restricted to at most two clusters) and under VI loss, and by the posterior
+similarity matrix; recovery is measured by the adjusted Rand index (ARI).
+
+**Dimension.** The compiled likelihood supports `d = 2` and `d = 3`, which
+covers all studies.
+
+## Data
+
+`data/real/` contains the two public data sets analysed in Section 4.5; both are
+distributed under the CC BY 4.0 licence by the UCI Machine Learning Repository.
+
+- `datatraining.txt`, `datatest.txt`, `datatest2.txt`: room occupancy, Candanedo,
+  L. M. and Feldheim, V. (2016), *Energy and Buildings* 112, 28--39. We use five-minute
+  averages of CO2 and humidity ratio on 5 February 2015, first-differenced and
+  rank-transformed (`n = 287`).
+- `winequality-red.csv`: Portuguese *Vinho Verde* red wine, Cortez, P., Cerdeira,
+  A., Almeida, F., Matos, T. and Reis, J. (2009), *Decision Support Systems* 47,
+  547--553. We use fixed acidity, citric acid and density (`n = 1599`).
+
+Both are mapped to `(0,1)` by `rank/(n+1)`.
+
+## Reproducibility notes
+
+- Random seeds are fixed in `config/job_manifest.csv` (simulations) and in
+  `scripts/run_real_data.R` (real data). A re-run on the same R version and
+  platform reproduces the reported numbers up to platform-dependent
+  floating-point differences in `copula` and in compiled code; the Monte Carlo
+  variability of LPML across independent chains is reported in Table 8.
+- `results/sessionInfo.txt` (created by `install_dependencies.R`) records the
+  package versions.
+- The earlier single-data-set Simulation 2 of a previous manuscript version is
+  archived in `results/full/legacy_v2_sim2/`; it uses the predictive-density LPML
+  estimator and does not feed any table of the current paper.
+
+## Tests
+
+```sh
+Rscript -e 'testthat::test_dir("tests/testthat")'
+```
+
+cover dimension-aware parameter spaces, Khoudraji margins and limiting cases
+(`alpha = 0` independence, `alpha = 1` Archimedean), normalisation and numerical
+stability of the densities, exactness of the simulator (uniform margins and
+Kendall's tau), finite adaptation, agreement of the stored and recomputed LPML,
+and a smoke fit for each study.
+
+## Citation and licence
+
+If you use this code, please cite the paper above. Code is released under the
+MIT licence (see `LICENSE.md`). The data sets retain their original licences.

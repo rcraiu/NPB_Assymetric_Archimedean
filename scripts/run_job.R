@@ -65,6 +65,7 @@ summary$empirical_tau <- dat$empirical_tau
 summary$data_seed <- dat$data_seed
 summary$fit_seed <- as.integer(row$fit_seed)
 summary$cpo_method <- fit$cpo_method
+summary$cpo_loo_method <- fit$cpo_loo_method
 
 write.csv(summary$summary,
           file.path(out, "summaries", paste0(job_id, "_summary.csv")),
