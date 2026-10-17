@@ -84,7 +84,7 @@ write_tex(c(
   "\\hline\\hline",
   "True $\\balpha$ & $n$ & Kernel & \\multicolumn{2}{c}{LPML} & $\\bar\\theta$ & $\\bar\\balpha$ & $\\widehat\\tau$ & $\\tau_{\\rm pp}$ \\\\",
   "\\cline{4-5}",
-  " & & & Nested & Free & & & & \\\\",
+  " & & & Exch & Khou & & & & \\\\",
   "\\hline",
   sim1_rows,
   "\\hline\\hline",
@@ -153,7 +153,7 @@ sim2_rep_rows <- c(
   sim2_rep_rows,
   sprintf("Oracle ARI (true parameters) & \\multicolumn{2}{c}{%s} \\\\",
           msd(rep_free$oracle_ari)),
-  sprintf("Free beats nested in LPML / ARI$_{B,2}$ & \\multicolumn{2}{c}{%d / %d of %d} \\\\",
+  sprintf("Khou beats Exch in LPML / ARI$_{B,2}$ & \\multicolumn{2}{c}{%d / %d of %d} \\\\",
           sum(d_lpml > 0), sum(rep_free$ari_binder2 > rep_nest$ari_binder2),
           n_rep),
   sprintf("Opposite-orientation clusters found (Binder $K\\leq2$) & %d of %d & %d of %d \\\\",
@@ -162,7 +162,7 @@ sim2_rep_rows <- c(
 write_tex(c(
   "\\begin{tabular}{lcc}",
   "\\hline\\hline",
-  sprintf("Summary over %d data sets & Free & Nested \\\\", n_rep),
+  sprintf("Summary over %d data sets & Khou & Exch \\\\", n_rep),
   "\\hline",
   sim2_rep_rows,
   "\\hline\\hline",
@@ -177,7 +177,7 @@ for (model in c("exchangeable", "free")) {
   m <- s$metrics
   sim2_rows <- c(sim2_rows, sprintf(
     "%s & %.2f & %.2f & %d & %.2f & %.2f & %d & %.2f & %.2f & %.3f \\\\",
-    if (model == "free") "Free" else "Nested",
+    if (model == "free") "Khou" else "Exch",
     s$summary$lpml, s$summary$m_mean, m$k_binder, m$ari_binder,
     m$ari_binder2, m$k_vi, m$ari_vi, m$ari_draw_mean,
     tau_matrix(s)[2, 1]))
@@ -225,7 +225,7 @@ for (model in c("exchangeable", "free")) {
   tau <- c(tm[2, 1], tm[3, 1], tm[3, 2])
   sim3_rows <- c(sim3_rows, sprintf(
     "%s & %.2f & %s & %.3f & %.3f & %.3f \\\\",
-    if (model == "free") "Free" else "Nested", s$summary$lpml,
+    if (model == "free") "Khou" else "Exch", s$summary$lpml,
     fmt_vec(s$alpha$mean), tau[1], tau[2], tau[3]
   ))
   sim3_csv[[model]] <- data.frame(
@@ -286,7 +286,7 @@ write_tex(c(
   "\\hline\\hline",
   "Truth & Kernel & \\multicolumn{2}{c}{LPML} & $\\Delta$ & $\\bar\\balpha$ & \\multicolumn{2}{c}{$\\tau_{\\rm pp}$} \\\\",
   "\\cline{3-4}\\cline{7-8}",
-  " & & Nested & Free & & & Nested & Free \\\\",
+  " & & Exch & Khou & & & Exch & Khou \\\\",
   "\\hline",
   sim4_rows,
   "\\hline\\hline",
@@ -325,29 +325,29 @@ render(file.path(out, "figure_sim2_mirror"), 12, 3, function() {
   plot(fit2f$U, pch = 16, cex = .55, col = c("#1b6ca8", "#d1495b")[zt],
        xlim = c(0, 1), ylim = c(0, 1), xlab = expression(u[1]),
        ylab = expression(u[2]), main = "Observed, by true component")
-  panel(pred2e, "Nested predictive")
-  panel(pred2f, "Free predictive")
+  panel(pred2e, "Exchangeable predictive")
+  panel(pred2f, "Khoudraji predictive")
   ord <- order(zt)
   P <- s2f$psm[ord, ord]
   image(seq_len(nrow(P)), seq_len(nrow(P)), P[, rev(seq_len(ncol(P)))],
         col = hcl.colors(50, "YlOrRd", rev = TRUE), zlim = c(0, 1),
         xlab = "Observation (ordered by true component)", ylab = "",
-        axes = FALSE, main = "Free posterior similarity")
+        axes = FALSE, main = "Khoudraji posterior similarity")
   box()
 })
 
 render(file.path(out, "figure_sim2_replicates"), 9, 3.2, function() {
   old <- par(mfrow = c(1, 3), mar = c(4, 4, 2, 1))
   on.exit(par(old))
-  boxplot(list(Nested = rep_nest$ari_psm2, Free = rep_free$ari_psm2,
+  boxplot(list(Exchangeable = rep_nest$ari_psm2, Khoudraji = rep_free$ari_psm2,
                Oracle = rep_free$oracle_ari), ylim = c(0, 1),
           ylab = "ARI (PSM cut, K = 2)", col = c("grey80", "#fbd08a", "white"),
           main = "Cluster recovery")
-  boxplot(list(Nested = rep_nest$ari_draw_mean, Free = rep_free$ari_draw_mean),
+  boxplot(list(Exchangeable = rep_nest$ari_draw_mean, Khoudraji = rep_free$ari_draw_mean),
           ylim = c(0, 1), ylab = "Posterior-mean ARI",
           col = c("grey80", "#fbd08a"), main = "Draw-level recovery")
   plot(rep_free$lpml - rep_nest$lpml, type = "h", lwd = 3,
-       xlab = "Data set", ylab = "LPML(free) - LPML(nested)",
+       xlab = "Data set", ylab = "LPML(Khoudraji) - LPML(exchangeable)",
        main = "Predictive fit", ylim = c(0, 1.05 * max(rep_free$lpml - rep_nest$lpml)))
 })
 
@@ -365,12 +365,12 @@ for (truth in c("single", "two")) {
     old <- par(mfrow = c(2, 4), mar = c(3, 3, 2, 1))
     on.exit(par(old))
     for (model in c("exchangeable", "free")) {
-      panel(observed, if (model == "exchangeable") "Observed (nested row)"
-            else "Observed (free row)")
+      panel(observed, if (model == "exchangeable") "Observed (exchangeable row)"
+            else "Observed (Khoudraji row)")
       for (family in c("CLA", "FRA", "GUM")) {
         id <- sprintf("sim4_%s_n500_%s_%s", truth, family, model)
         panel(preds[[id]], paste(family,
-                                if (model == "exchangeable") "nested" else "free"))
+                                if (model == "exchangeable") "exchangeable" else "Khoudraji"))
       }
     }
   })

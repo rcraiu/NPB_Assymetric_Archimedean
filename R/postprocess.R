@@ -162,8 +162,16 @@ compact_summary <- function(fit, scenario, job_id, tau_n = 2000L, seed = 1L) {
   )
 }
 
+## Plot titles use the manuscript names: "exchangeable" (alpha = 1) and
+## "Khoudraji" (alpha estimated); job identifiers keep the internal suffixes.
+model_label <- function(x) {
+  x <- sub("_free$", " (Khoudraji)", x)
+  sub("_exchangeable$", " (exchangeable)", x)
+}
+
 write_contour_pdf <- function(U, predictive, file, title = "") {
   if (ncol(U) != 2) return(invisible(FALSE))
+  title <- model_label(title)
   grDevices::pdf(file, width = 7, height = 3.5)
   on.exit(grDevices::dev.off(), add = TRUE)
   old <- par(mfrow = c(1, 2), mar = c(3, 3, 2, 1))
@@ -206,4 +214,26 @@ clustering_metrics <- function(fit, truth_z, P, partition, partition_binder2,
     k_binder2 = length(unique(partition_binder2)),
     k_vi = length(unique(partition_vi))
   )
+}
+
+## Component-specific CPO / LPML (Pan et al., 2025) recomputed from stored
+## draws: CPO_i = [mean_l 1 / c_{xi_i^(l)}(u_i)]^{-1}.  Works on any fit that
+## stores the per-observation atoms (fit$th, fit$al), including older fits.
+lpml_component <- function(fit) {
+  U <- fit$U; n <- nrow(U); L <- nrow(fit$th)
+  inv <- numeric(n)
+  for (l in seq_len(L)) {
+    ## group observations by atom (theta, alpha) to vectorise the evaluation
+    atoms <- cbind(fit$th[l, ], matrix(fit$al[l, , ], n))
+    id <- match(do.call(paste, c(as.data.frame(atoms), sep = "|")),
+                unique(do.call(paste, c(as.data.frame(atoms), sep = "|"))))
+    for (k in unique(id)) {
+      idx <- which(id == k)
+      ld <- log_d_khoud(U[idx, , drop = FALSE], atoms[idx[1], 1],
+                        atoms[idx[1], -1], fit$family)
+      inv[idx] <- inv[idx] + exp(-ld)
+    }
+  }
+  cpo <- 1 / (inv / L)
+  list(lpml = sum(log(pmax(cpo, 1e-300))), cpo = cpo)
 }

@@ -52,6 +52,11 @@ fit_khoud_pd <- function(U, family, pars = NULL, verbose = TRUE) {
   keep_z <- matrix(NA_integer_, n_keep, n)
   keep_a <- keep_b <- keep_m <- numeric(n_keep)
   pred_dens <- matrix(NA_real_, n_keep, n)
+  comp_dens <- matrix(NA_real_, n_keep, n)
+  tuning_trace <- matrix(NA_real_, 0, 6,
+                         dimnames = list(NULL, c("iteration", "kappa_theta",
+                                                 "kappa_alpha", "kappa_a",
+                                                 "kappa_b", "delta")))
 
   accepted <- attempted <- c(theta = 0, alpha = 0, a = 0, b = 0)
   total_accepted <- total_attempted <- accepted
@@ -195,6 +200,8 @@ fit_khoud_pd <- function(U, family, pars = NULL, verbose = TRUE) {
       total_accepted["b"] <- total_accepted["b"] + 1
     }
 
+    ## Finite adaptation: the tuning constants are updated only while
+    ## it <= burn, so the retained draws come from a fixed-kernel chain.
     if (it %% batch_size == 0L && it <= pars$burn) {
       batch <- batch + 1L
       delta <- min(0.05, batch^(-0.6))
@@ -207,6 +214,7 @@ fit_khoud_pd <- function(U, family, pars = NULL, verbose = TRUE) {
       kth <- min(max(kth, 1e-5), 10)
       kal <- min(max(kal, 1e-4), 5)
       kb <- min(max(kb, 1e-4), 3)
+      tuning_trace <- rbind(tuning_trace, c(it, kth, kal, ka, kb, delta))
       accepted[] <- attempted[] <- 0
     }
 
@@ -230,6 +238,9 @@ fit_khoud_pd <- function(U, family, pars = NULL, verbose = TRUE) {
       comp_d <- matrix(0, n, m)
       for (k in seq_len(m))
         comp_d[, k] <- exp(log_d_khoud(U, th_star[k], al_star[k, ], family))
+      ## Component-specific density c_{xi_i}(u_i) at the current atom of i; its
+      ## harmonic mean is the exact CPO identity used by Pan et al. (2025).
+      comp_dens[kidx, ] <- comp_d[cbind(seq_len(n), z)]
       for (i in seq_len(n)) {
         cc <- counts
         cc[z[i]] <- cc[z[i]] - 1L
@@ -247,8 +258,14 @@ fit_khoud_pd <- function(U, family, pars = NULL, verbose = TRUE) {
   }
 
   cpo <- 1 / colMeans(1 / pmax(pred_dens, 1e-300))
+  cpo_comp <- 1 / colMeans(1 / pmax(comp_dens, 1e-300))
   list(family = family, alpha_fixed = alpha_fixed,
        lpml = sum(log(pmax(cpo, 1e-300))), cpo = cpo,
+       lpml_comp = sum(log(pmax(cpo_comp, 1e-300))), cpo_comp = cpo_comp,
+       tuning_trace = tuning_trace,
+       adaptation = list(finite = TRUE, last_adapted_iteration = if (nrow(tuning_trace))
+         max(tuning_trace[, "iteration"]) else 0L, burn = pars$burn,
+         final_kappa = c(theta = kth, alpha = kal, a = ka, b = kb)),
        th = keep_th, al = keep_al, z = keep_z,
        a = keep_a, b = keep_b, m = keep_m, U = U, pars = pars,
        acceptance = total_accepted / pmax(total_attempted, 1),

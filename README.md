@@ -144,3 +144,29 @@ The earlier single-data-set Simulation 2 (`CLA(30; 1, .95)` and
 `CLA(1; .05, 1)`) is archived, with its summaries and figures, under
 `results/full/legacy_v2_sim2/` (fitted chains excluded). It is no longer in
 the job manifest and no longer feeds the manuscript tables.
+
+## Real-data refits (occupancy and red wine)
+
+```sh
+Rscript scripts/run_real_data.R --mode full --cores 9 --seeds 1,2,3
+Rscript scripts/real_data_tables.R
+```
+
+Uses the same sampler as Simulations 1--4. Data are in `data/real/`
+(Candanedo and Feldheim occupancy; Cortez et al. red wine). Exchangeable
+(`alpha = 1`) fits are run for three seeds; Khoudraji fits for seed 1.
+`results/real/full/real_data_summary.csv` holds the LPML summaries.
+
+## Sampler conventions
+
+- **Finite adaptation.** The MH tuning constants are updated in batches of 50
+  iterations only while `it <= burn` (step `min(.05, j^-0.6)`, target
+  acceptance .35); they are frozen afterwards. `fit$tuning_trace` and
+  `fit$adaptation` record this, and `tests/testthat` checks it.
+- **LPML.** `fit$lpml` is the harmonic mean of leave-one-out PD predictive
+  densities (used in Simulations 1--4); `fit$lpml_comp` is the
+  component-specific harmonic mean of Pan et al. (2025) (used for the
+  real-data tables). `lpml_component()` recomputes the latter from stored
+  draws; `results/full/summaries/lpml_both_estimators.csv` compares both.
+- Plot labels use "Exchangeable" and "Khoudraji"; `scripts/regenerate_job_figures.R`
+  rebuilds the per-job PDFs from stored raw fits.

@@ -26,3 +26,21 @@ testthat::test_that("all four studies complete tiny smoke fits", {
     testthat::expect_true(all(is.finite(fit$cpo)))
   }
 })
+
+testthat::test_that("tuning constants adapt only during burn-in (finite adaptation)", {
+  set.seed(1)
+  U <- rkhoud(60L, "CLA", 3, c(.9, .5))
+  pars <- default_pars("CLA", 2)
+  pars$n_iter <- 120L; pars$burn <- 60L; pars$thin <- 5L
+  pars$batch_size <- 10L; pars$r_aux <- 2L; pars$cpo_aux <- 2L
+  fit <- fit_khoud_pd(U, "CLA", pars, verbose = FALSE)
+  tr <- fit$tuning_trace
+  testthat::expect_equal(nrow(tr), 6L)
+  testthat::expect_true(max(tr[, "iteration"]) <= pars$burn)
+  testthat::expect_equal(unname(fit$adaptation$final_kappa),
+                         unname(tr[nrow(tr), c("kappa_theta", "kappa_alpha",
+                                               "kappa_a", "kappa_b")]))
+  ## component-specific LPML is finite and recomputable from the stored draws
+  testthat::expect_true(is.finite(fit$lpml_comp))
+  testthat::expect_equal(lpml_component(fit)$lpml, fit$lpml_comp, tolerance = 1e-6)
+})
